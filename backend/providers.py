@@ -624,31 +624,18 @@ def extract_via_huggingface(
             "HF_TOKEN is not set"
         )
 
-    # IMPORTANT:
-    #
-    # The previous version defaulted to:
-    #
-    #     Qwen/Qwen3-VL-8B-Instruct
-    #
-    # Your Hugging Face Router returned:
-    #
-    #     model_not_supported
-    #
-    # Therefore do NOT force Qwen3-VL here.
-    #
-    # The model can still be overridden with QWEN_MODEL.
     model = os.getenv(
         "QWEN_MODEL",
         "Qwen/Qwen2.5-VL-7B-Instruct",
     ).strip()
 
-    provider = os.getenv(
-        "HF_PROVIDER",
-        "",
-    ).strip()
+    # Do not force the unavailable Featherless Qwen3-VL model.
+    if model.lower() == "qwen/qwen3-vl-8b-instruct:featherless-ai":
+        model = "Qwen/Qwen2.5-VL-7B-Instruct"
+
+    provider = os.getenv("HF_PROVIDER", "").strip()
 
     headers = {}
-
     if provider:
         headers["X-HF-Provider"] = provider
 
