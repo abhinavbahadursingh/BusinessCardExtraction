@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-from providers import LEAD_KEYS, active_provider, extract_lead, provider_configured
+from .providers import LEAD_KEYS, active_provider, extract_lead, provider_configured
 
 MAX_FILES = 50
 MAX_FILE_MB = 10
