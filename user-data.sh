@@ -25,6 +25,8 @@ cd "$APP_DIR"
 # export DASHSCOPE_API_KEY=sk-your-key
 # export QWEN_PROVIDER=openrouter
 # export OPENROUTER_API_KEY=sk-or-your-key
+# export QWEN_PROVIDER=groq
+# export GROQ_API_KEY=gsk-your-key
 if [ -f .env ]; then
   set -a; source .env; set +a
 fi
@@ -38,6 +40,7 @@ if [ -f Dockerfile ]; then
     -e DASHSCOPE_API_KEY="${DASHSCOPE_API_KEY:-}" \
     -e OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}" \
     -e HF_TOKEN="${HF_TOKEN:-}" \
+    -e GROQ_API_KEY="${GROQ_API_KEY:-}" \
     -e QWEN_MODEL="${QWEN_MODEL:-}" \
     card-extractor
 fi

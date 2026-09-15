@@ -267,7 +267,7 @@ export default function App() {
         </section>
 
         <footer className="footer">
-          FastAPI + Qwen VLM (DashScope · OpenRouter · HuggingFace · Ollama · mock) · Excel via openpyxl
+          FastAPI + Qwen VLM (DashScope · OpenRouter · HuggingFace · Groq · Ollama · mock) · Excel via openpyxl
         </footer>
       </div>
     </div>

@@ -30,6 +30,16 @@ Supported providers (selected via QWEN_PROVIDER):
       Endpoint:
         https://router.huggingface.co/v1/chat/completions
 
+  - groq
+      Groq API (OpenAI-compatible, fast inference).
+      Env:
+        GROQ_API_KEY
+        QWEN_MODEL (optional, default: meta-llama/llama-4-scout-17b-16e-instruct;
+          override with e.g. qwen/qwen3.6-27b for a Qwen vision model)
+        GROQ_BASE_URL (optional)
+      Endpoint:
+        https://api.groq.com/openai/v1/chat/completions
+
   - ollama
       Local Ollama server.
       Env:
@@ -663,6 +673,101 @@ def extract_via_huggingface(
 
 
 # ---------------------------------------------------------------------------
+# Groq
+# ---------------------------------------------------------------------------
+
+GROQ_DEFAULT_MODELS = [
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "qwen/qwen3.6-27b",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+]
+
+GROQ_DEFAULT_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+
+def extract_via_groq(
+    image_bytes: bytes,
+) -> dict:
+    """
+    Extract using the Groq API.
+
+    Groq exposes an OpenAI-compatible chat-completions endpoint that
+    supports vision models (text + image_url input). If QWEN_MODEL is not
+    specified, the configured default vision models are tried sequentially.
+    If QWEN_MODEL is specified, only that model is used.
+
+    Environment variables:
+
+        GROQ_API_KEY  (required, starts with gsk_...)
+        QWEN_MODEL    (optional, e.g. qwen/qwen3.6-27b,
+                      meta-llama/llama-4-scout-17b-16e-instruct)
+        GROQ_BASE_URL (optional, defaults to the Groq OpenAI-compatible
+                      chat-completions endpoint)
+
+    Example:
+
+        QWEN_PROVIDER=groq
+        GROQ_API_KEY=gsk-...
+        QWEN_MODEL=qwen/qwen3.6-27b
+
+    Get a key at https://console.groq.com/keys. Vision-capable models
+    include meta-llama/llama-4-scout-17b-16e-instruct (production),
+    meta-llama/llama-4-maverick-17b-128e-instruct, and qwen/qwen3.6-27b.
+    """
+    api_key = os.getenv(
+        "GROQ_API_KEY",
+        "",
+    ).strip()
+
+    if not api_key:
+        raise RuntimeError(
+            "GROQ_API_KEY is not set"
+        )
+
+    configured_model = os.getenv(
+        "QWEN_MODEL",
+        "",
+    ).strip()
+
+    if configured_model:
+        models = [configured_model]
+    else:
+        models = GROQ_DEFAULT_MODELS
+
+    base_url = os.getenv(
+        "GROQ_BASE_URL",
+        GROQ_DEFAULT_BASE_URL,
+    ).strip()
+
+    data_uri = image_to_data_uri(image_bytes)
+
+    last_error: Exception | None = None
+
+    for model in models:
+        try:
+            return _openai_compatible_extract(
+                provider="Groq",
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                data_uri=data_uri,
+            )
+
+        except Exception as exc:
+            last_error = exc
+
+            # If the user explicitly configured a model, do not silently
+            # switch to another model.
+            if configured_model:
+                break
+
+    raise RuntimeError(
+        "Groq extraction failed. "
+        f"Last error: {last_error}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Ollama
 # ---------------------------------------------------------------------------
 
@@ -791,6 +896,7 @@ PROVIDERS = {
     "dashscope": extract_via_dashscope,
     "openrouter": extract_via_openrouter,
     "huggingface": extract_via_huggingface,
+    "groq": extract_via_groq,
     "ollama": extract_via_ollama,
     "mock": extract_via_mock,
 }
@@ -839,6 +945,11 @@ def provider_configured() -> bool:
     if name == "huggingface":
         return bool(
             os.getenv("HF_TOKEN", "").strip()
+        )
+
+    if name == "groq":
+        return bool(
+            os.getenv("GROQ_API_KEY", "").strip()
         )
 
     if name == "ollama":

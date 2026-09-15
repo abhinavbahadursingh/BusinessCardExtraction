@@ -5,6 +5,7 @@ Also serves the React production build (backend/static) when present.
 
 import io
 import os
+from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -15,8 +16,16 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
-from .providers import LEAD_KEYS, active_provider, extract_lead, provider_configured
+from .providers import (
+    LEAD_KEYS,
+    active_provider,
+    extract_lead,
+    provider_configured,
+)
+# from providers import LEAD_KEYS, active_provider, extract_lead, provider_configured
 
 MAX_FILES = 50
 MAX_FILE_MB = 10
@@ -107,6 +116,7 @@ def config():
         "dashscope": "qwen-vl-max (default, override with QWEN_MODEL)",
         "openrouter": "qwen3-vl-8b-instruct (needs a few $ credit, ~$0.0002/card; override with QWEN_MODEL)",
         "huggingface": "Qwen3-VL-8B-Instruct pinned to featherless-ai (override with QWEN_MODEL)",
+        "groq": "llama-4-scout vision (default, override with QWEN_MODEL, e.g. qwen/qwen3.6-27b)",
         "ollama": "qwen2-vl (default, override with QWEN_MODEL)",
         "mock": "offline demo data (no key needed)",
     }

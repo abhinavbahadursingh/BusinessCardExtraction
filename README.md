@@ -17,9 +17,10 @@ contained the correct headers and both data rows.
 
 ```
 Browser (React, dark UI) ──▶ FastAPI on EC2 t2.micro ──▶ Qwen VLM API ──▶ JSON leads ──▶ Excel
-                                                        ├─ huggingface (DEFAULT, real, tested)
-                                                        ├─ openrouter  (needs $ credit)
-                                                        ├─ dashscope   (official Alibaba API)
+                                                         ├─ huggingface (DEFAULT, real, tested)
+                                                         ├─ openrouter  (needs $ credit)
+                                                         ├─ groq        (fast, free tier; vision models)
+                                                         ├─ dashscope   (official Alibaba API)
                                                         ├─ ollama      (local GPU, no key)
                                                         └─ mock        (offline demo, no key)
 ```
@@ -32,7 +33,7 @@ impossible on the free tier, so the EC2 instance runs only this lightweight app
 deployment free-tier-eligible while still using a state-of-the-art VLM.
 
 **D2 — Provider abstraction (`backend/providers.py`).**
-All five providers implement one interface, `extract_lead(image_bytes) -> dict`,
+All six providers implement one interface, `extract_lead(image_bytes) -> dict`,
 sharing a single extraction prompt, image preprocessing (downscale to ≤1568 px
 JPEG to save bandwidth), and lenient JSON parsing. Switching models/providers is
 one env var (`QWEN_PROVIDER`), no code change.
@@ -83,12 +84,13 @@ The default therefore pins the provider (see `QWEN_MODEL`).
   OCR/document understanding. Served server-side by the **featherless-ai**
   Inference Provider; the app never downloads weights.
 - Alternatives selectable via env: `qwen3-vl-8b-instruct` / `qwen2.5-vl-72b-instruct`
-  (OpenRouter), `qwen-vl-max` (DashScope), `qwen2-vl` (Ollama).
+  (OpenRouter), `qwen-vl-max` (DashScope), `qwen2-vl` (Ollama),
+  `meta-llama/llama-4-scout-17b-16e-instruct` / `qwen/qwen3.6-27b` (Groq).
 
 ### External components / services
 - **Hugging Face Inference Providers** (`router.huggingface.co/v1/chat/completions`,
   OpenAI-compatible) — live model serving; needs `HF_TOKEN` + enabled provider.
-- **OpenRouter / DashScope / Ollama** — alternative serving paths (same interface).
+- **OpenRouter / DashScope / Groq / Ollama** — alternative serving paths (same interface).
 - **AWS** — EC2 `t2.micro` (free tier), Elastic Beanstalk, or App Runner for hosting;
   ECR for images; Secrets Manager/SSM recommended for keys in production.
 - **Docker** — multi-stage image (`node:20-slim` build → `python:3.11-slim` runtime).
@@ -213,7 +215,7 @@ involved.
   assertions → Excel round-trip checks.
 
 **Significant AI-generated code/architecture adopted.**
-- Remote-API-over-local-hosting architecture (D1) and the five-provider
+- Remote-API-over-local-hosting architecture (D1) and the provider
   abstraction with shared prompt/parsing (D2) — proposed by the agent, kept.
 - Free-first OpenRouter fallback chain and verbatim API-error surfacing in the
   `Position` field — proposed by the agent after reading live error bodies, kept.
