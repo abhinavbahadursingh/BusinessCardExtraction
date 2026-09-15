@@ -19,7 +19,7 @@ BusinessCardExtraction/
 │   ├── providers.py      # VLM provider abstraction (6 providers, prompt, image prep, parsing, retries)
 │   ├── requirements.txt  # Pinned Python deps
 │   ├── runtime.txt       # python-3.11.11 (EB / PaaS pin)
-│   ├── __inti__.py       # Empty (note typo: should be __init__.py)
+│   ├── __init__.py       # Empty
 │   └── static/           # Git-ignored build output of frontend (vite build --outDir ../backend/static)
 ├── frontend/
 │   ├── src/App.jsx       # Single-page app: upload, progress, editable grid, Excel download
