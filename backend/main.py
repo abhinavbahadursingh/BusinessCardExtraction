@@ -19,7 +19,7 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-from .providers import (
+from providers import (
     LEAD_KEYS,
     active_provider,
     extract_lead,

@@ -59,6 +59,7 @@ import io
 import json
 import os
 import re
+import time
 from typing import Any
 
 import httpx
@@ -348,6 +349,41 @@ def _format_http_error(
     )
 
 
+def _rate_limit_delay(
+    response: httpx.Response,
+    attempt: int,
+) -> float:
+    """
+    Delay (seconds) before retrying a rate-limited (HTTP 429) request.
+
+    Honors the server's Retry-After header when present, otherwise uses
+    exponential backoff (2s, 4s, 8s, ...) capped at 30s.
+    """
+    try:
+        retry_after = response.headers.get("retry-after")
+
+        if retry_after:
+            delay = float(str(retry_after).strip().split(",")[0])
+
+            if delay >= 0:
+                return min(delay, 60.0)
+
+    except (TypeError, ValueError):
+        pass
+
+    return min(2.0 * (2 ** attempt), 30.0)
+
+
+def _max_retries() -> int:
+    """Number of retries on HTTP 429 (configurable via PROVIDER_MAX_RETRIES)."""
+    try:
+        value = int(os.getenv("PROVIDER_MAX_RETRIES", "4"))
+    except (TypeError, ValueError):
+        return 4
+
+    return max(0, min(value, 10))
+
+
 def _openai_compatible_extract(
     *,
     provider: str,
@@ -406,32 +442,47 @@ def _openai_compatible_extract(
         ],
     }
 
-    try:
-        with httpx.Client(timeout=timeout) as client:
-            response = client.post(
-                base_url,
-                headers=headers,
-                json=payload,
-            )
+    max_retries = _max_retries()
+    retried = 0
 
-    except httpx.TimeoutException as exc:
-        raise RuntimeError(
-            f"{provider} request timed out after {timeout:.0f}s"
-        ) from exc
+    with httpx.Client(timeout=timeout) as client:
+        for attempt in range(max_retries + 1):
+            try:
+                response = client.post(
+                    base_url,
+                    headers=headers,
+                    json=payload,
+                )
 
-    except httpx.RequestError as exc:
-        raise RuntimeError(
-            f"{provider} network error: {exc}"
-        ) from exc
+            except httpx.TimeoutException as exc:
+                raise RuntimeError(
+                    f"{provider} request timed out after {timeout:.0f}s"
+                ) from exc
+
+            except httpx.RequestError as exc:
+                raise RuntimeError(
+                    f"{provider} network error: {exc}"
+                ) from exc
+
+            # Rate limited: wait and retry instead of failing the card.
+            if response.status_code == 429 and attempt < max_retries:
+                retried += 1
+                time.sleep(_rate_limit_delay(response, attempt))
+                continue
+
+            break
 
     if response.status_code >= 400:
-        raise RuntimeError(
-            _format_http_error(
-                response,
-                provider,
-                model,
-            )
+        message = _format_http_error(
+            response,
+            provider,
+            model,
         )
+
+        if response.status_code == 429 and retried:
+            message += f" (retried {retried}x)"
+
+        raise RuntimeError(message)
 
     try:
         body = response.json()

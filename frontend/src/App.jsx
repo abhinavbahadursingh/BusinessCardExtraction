@@ -33,6 +33,7 @@ export default function App() {
   const [previews, setPreviews] = useState([])
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(false)
+  const [progress, setProgress] = useState(null)
   const [error, setError] = useState('')
   const [config, setConfig] = useState(null)
   const [dragOver, setDragOver] = useState(false)
@@ -64,20 +65,37 @@ export default function App() {
 
   const extract = async () => {
     if (files.length === 0) { setError('Please select at least one business card image.'); return }
-    setLoading(true); setError('')
+    // One card per request, sequentially: each lead appears in the table
+    // as soon as it is ready, and the API is never hit with parallel
+    // calls (avoids rate limits on e.g. Groq).
+    setLoading(true); setError(''); setLeads([])
+    setProgress({ done: 0, total: files.length, current: '' })
+    const collected = []
+    const failed = []
     try {
-      const form = new FormData()
-      files.forEach(f => form.append('files', f, f.name))
-      const res = await fetch('/api/extract', { method: 'POST', body: form })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Extraction failed')
-      setLeads(data.leads || [])
-      if (data.errors?.length) setError(data.errors.map(e => `${e.file}: ${e.error}`).join(' · '))
-    } catch (e) {
-      setError(e.message)
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        setProgress({ done: i, total: files.length, current: file.name })
+        try {
+          const form = new FormData()
+          form.append('files', file, file.name)
+          const res = await fetch('/api/extract', { method: 'POST', body: form })
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error || 'Extraction failed')
+          for (const lead of (data.leads || [])) {
+            collected.push(lead)
+            setLeads([...collected])
+          }
+          for (const e of (data.errors || [])) failed.push(`${e.file}: ${e.error}`)
+        } catch (e) {
+          failed.push(`${file.name}: ${e.message}`)
+        }
+        setProgress({ done: i + 1, total: files.length, current: file.name })
+      }
     } finally {
-      setLoading(false)
+      setLoading(false); setProgress(null)
     }
+    if (failed.length) setError(failed.join(' · '))
   }
 
   const downloadExcel = async () => {
@@ -190,10 +208,13 @@ export default function App() {
           <div className="actions">
             <button type="button" className="btn primary" onClick={extract} disabled={loading || files.length === 0}>
               {loading && <span className="spinner" aria-hidden="true" />}
-              {loading ? 'Extracting with Qwen…' : `Extract leads from ${files.length} card${files.length === 1 ? '' : 's'}`}
+              {loading && progress ? `Extracting ${progress.done}/${progress.total}…` : loading ? 'Extracting with Qwen…' : `Extract leads from ${files.length} card${files.length === 1 ? '' : 's'}`}
             </button>
             <button type="button" className="btn ghost" onClick={clearAll} disabled={loading || (files.length === 0 && leads.length === 0)}>Clear</button>
           </div>
+          {loading && progress && progress.current && (
+            <div className="progress" role="status">Processing {progress.done}/{progress.total} · {progress.current}</div>
+          )}
           {error && <div className="alert" role="alert">{error}</div>}
         </section>
 

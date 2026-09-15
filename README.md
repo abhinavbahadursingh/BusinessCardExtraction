@@ -244,6 +244,10 @@ involved.
   is editable so any field can be corrected before Excel export.
 - `mock` mode returns clearly labeled demo data — never mistaken for real output.
 - Images are downscaled to ≤1568 px JPEG before being sent to the VLM.
+- Bulk uploads are processed one card at a time: the UI sends each image in
+  its own request and shows each lead as soon as it is ready, so API calls
+  are never parallel. HTTP 429 rate limits are retried automatically with
+  backoff (honors `Retry-After`; tune with `PROVIDER_MAX_RETRIES`).
 - Production hardening still to do: restrict CORS in `backend/main.py`, add
   auth/rate-limiting, move keys to Secrets Manager/SSM, serve behind HTTPS.
 #   B u s i n e s s C a r d E x t r a c t i o n  
